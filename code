@@ -1,0 +1,67 @@
+#include <SoftwareSerial.h>
+
+SoftwareSerial boltSerial(10, 11);  // RX, TX
+
+const char* API_KEY = "YourBoltApiKey";
+const char* DEVICE_ID = "YourBoltDeviceId";
+const char* BASE_URL = "https://cloud.boltiot.com/remote/";
+
+const int garageDoorPin = 2;
+bool isGarageOpen = false;
+
+void setup() {
+  Serial.begin(9600);
+  boltSerial.begin(9600);
+  pinMode(garageDoorPin, INPUT);
+
+  connectToWiFi();
+}
+
+void loop() {
+  int garageStatus = digitalRead(garageDoorPin);
+
+  if (garageStatus == HIGH && !isGarageOpen) {
+    sendGarageStatus("open");
+    isGarageOpen = true;
+  } else if (garageStatus == LOW && isGarageOpen) {
+    sendGarageStatus("closed");
+    isGarageOpen = false;
+  }
+
+  delay(5000);  // Check garage status every 5 seconds
+}
+
+void connectToWiFi() {
+  boltSerial.println("AT+CWJAP=\"YourWiFiSSID\",\"YourWiFiPassword\"");
+  delay(2000);
+}
+
+void sendGarageStatus(const char* status) {
+  String url = BASE_URL;
+  url += "updateDigitalPin?pin=0&value=";
+  url += status;
+  url += "&deviceName=";
+  url += DEVICE_ID;
+  url += "&apiKey=";
+  url += API_KEY;
+
+  boltSerial.print("AT+CIPSTART=\"TCP\",\"");
+  boltSerial.print("cloud.boltiot.com");
+  boltSerial.println("\",80");
+  delay(2000);
+
+  boltSerial.print("AT+CIPSEND=");
+  boltSerial.println(url.length() + 4);
+  delay(1000);
+
+  boltSerial.print("GET ");
+  boltSerial.print(url);
+  boltSerial.println(" HTTP/1.1");
+  boltSerial.println("Host: cloud.boltiot.com");
+  boltSerial.println("Connection: close");
+  boltSerial.println();
+  delay(1000);
+
+  boltSerial.println("AT+CIPCLOSE");
+  delay(2000);
+}
